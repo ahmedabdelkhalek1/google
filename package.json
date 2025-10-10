@@ -1,0 +1,16 @@
+{
+  "name": "file-sharing-app",
+  "version": "1.0.0",
+  "description": "File upload and download web app",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-fileupload": "^1.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
