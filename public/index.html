@@ -5,11 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>File Sharing App</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    /* ... [UNCHANGED CSS, keep yours as is] ... */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -30,16 +27,9 @@
       padding: 30px;
       text-align: center;
     }
-    .header h1 {
-      font-size: 2em;
-      margin-bottom: 10px;
-    }
-    .content {
-      padding: 30px;
-    }
-    .upload-section, .files-section {
-      margin-bottom: 30px;
-    }
+    .header h1 { font-size: 2em; margin-bottom: 10px; }
+    .content { padding: 30px; }
+    .upload-section, .files-section { margin-bottom: 30px; }
     h2 {
       color: #333;
       margin-bottom: 20px;
@@ -54,17 +44,9 @@
       cursor: pointer;
       transition: all 0.3s;
     }
-    .upload-area:hover {
-      background: #f8f9ff;
-      border-color: #764ba2;
-    }
-    .upload-area.dragover {
-      background: #e8ebff;
-      border-color: #764ba2;
-    }
-    input[type="file"] {
-      display: none;
-    }
+    .upload-area:hover { background: #f8f9ff; border-color: #764ba2; }
+    .upload-area.dragover { background: #e8ebff; border-color: #764ba2; }
+    input[type="file"] { display: none; }
     .btn {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -80,13 +62,8 @@
       transform: translateY(-2px);
       box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
     }
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .file-list {
-      list-style: none;
-    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .file-list { list-style: none; }
     .file-item {
       background: #f8f9fa;
       padding: 15px;
@@ -96,9 +73,7 @@
       justify-content: space-between;
       align-items: center;
     }
-    .file-info {
-      flex: 1;
-    }
+    .file-info { flex: 1; }
     .file-name {
       font-weight: 600;
       color: #333;
@@ -113,47 +88,22 @@
       display: flex;
       gap: 10px;
     }
-    .btn-small {
-      padding: 8px 15px;
-      font-size: 14px;
-      margin: 0;
-    }
-    .btn-download {
-      background: #28a745;
-    }
-    .btn-delete {
-      background: #dc3545;
-    }
+    .btn-small { padding: 8px 15px; font-size: 14px; margin: 0; }
+    .btn-download { background: #28a745; }
+    .btn-delete { background: #dc3545; }
     .message {
       padding: 15px;
       border-radius: 8px;
       margin-bottom: 20px;
       text-align: center;
     }
-    .success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-    .error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-    .hidden {
-      display: none;
-    }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .hidden { display: none; }
     @media (max-width: 600px) {
-      .file-item {
-        flex-direction: column;
-        gap: 10px;
-      }
-      .file-actions {
-        width: 100%;
-      }
-      .btn-small {
-        flex: 1;
-      }
+      .file-item { flex-direction: column; gap: 10px; }
+      .file-actions { width: 100%; }
+      .btn-small { flex: 1; }
     }
   </style>
 </head>
@@ -163,10 +113,8 @@
       <h1>📁 File Sharing App</h1>
       <p>Upload and download files easily from any device</p>
     </div>
-    
     <div class="content">
       <div id="message" class="message hidden"></div>
-      
       <div class="upload-section">
         <h2>📤 Upload File</h2>
         <div class="upload-area" id="uploadArea">
@@ -177,14 +125,12 @@
         </div>
         <button class="btn" id="uploadBtn" disabled>Upload File</button>
       </div>
-      
       <div class="files-section">
         <h2>📥 Available Files</h2>
         <ul class="file-list" id="fileList"></ul>
       </div>
     </div>
   </div>
-
   <script>
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
@@ -192,16 +138,14 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const fileList = document.getElementById('fileList');
     const messageDiv = document.getElementById('message');
-    
+
     let selectedFile = null;
-    
-    // Click to select file
+
     selectBtn.addEventListener('click', () => fileInput.click());
     uploadArea.addEventListener('click', (e) => {
       if (e.target !== selectBtn) fileInput.click();
     });
-    
-    // File selected
+
     fileInput.addEventListener('change', (e) => {
       selectedFile = e.target.files[0];
       if (selectedFile) {
@@ -209,17 +153,16 @@
         uploadBtn.disabled = false;
       }
     });
-    
-    // Drag and drop
+
     uploadArea.addEventListener('dragover', (e) => {
       e.preventDefault();
       uploadArea.classList.add('dragover');
     });
-    
+
     uploadArea.addEventListener('dragleave', () => {
       uploadArea.classList.remove('dragover');
     });
-    
+
     uploadArea.addEventListener('drop', (e) => {
       e.preventDefault();
       uploadArea.classList.remove('dragover');
@@ -229,25 +172,24 @@
         uploadBtn.disabled = false;
       }
     });
-    
-    // Upload file
+
+    // ***** MODIFIED: endpoint is now '/submitData' *****
     uploadBtn.addEventListener('click', async () => {
       if (!selectedFile) return;
-      
       const formData = new FormData();
       formData.append('uploadFile', selectedFile);
-      
+
       uploadBtn.disabled = true;
       uploadBtn.textContent = 'Uploading...';
-      
+
       try {
-        const response = await fetch('/upload', {
+        const response = await fetch('/submitData', { // <--- Changed endpoint here!
           method: 'POST',
           body: formData
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
           showMessage('File uploaded successfully!', 'success');
           fileInput.value = '';
@@ -261,23 +203,22 @@
       } catch (error) {
         showMessage('Upload failed: ' + error.message, 'error');
       }
-      
       uploadBtn.textContent = 'Upload File';
     });
-    
+
     // Load files
     async function loadFiles() {
       try {
         const response = await fetch('/files');
         const files = await response.json();
-        
+
         fileList.innerHTML = '';
-        
+
         if (files.length === 0) {
           fileList.innerHTML = '<li class="file-item"><p>No files uploaded yet</p></li>';
           return;
         }
-        
+
         files.forEach(file => {
           const li = document.createElement('li');
           li.className = 'file-item';
@@ -301,22 +242,22 @@
         console.error('Failed to load files:', error);
       }
     }
-    
+
     // Download file
     window.downloadFile = (filename) => {
       window.location.href = `/download/${encodeURIComponent(filename)}`;
     };
-    
+
     // Delete file
     window.deleteFile = async (filename) => {
       if (!confirm(`Delete ${filename}?`)) return;
-      
+
       try {
         const response = await fetch(`/delete/${encodeURIComponent(filename)}`, {
           method: 'DELETE'
         });
         const data = await response.json();
-        
+
         if (data.success) {
           showMessage('File deleted successfully', 'success');
           loadFiles();
@@ -327,16 +268,14 @@
         showMessage('Delete failed: ' + error.message, 'error');
       }
     };
-    
-    // Show message
+
     function showMessage(text, type) {
       messageDiv.textContent = text;
       messageDiv.className = `message ${type}`;
       messageDiv.classList.remove('hidden');
       setTimeout(() => messageDiv.classList.add('hidden'), 5000);
     }
-    
-    // Format bytes
+
     function formatBytes(bytes) {
       if (bytes === 0) return '0 Bytes';
       const k = 1024;
@@ -344,8 +283,7 @@
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
     }
-    
-    // Initial load
+
     loadFiles();
   </script>
 </body>
