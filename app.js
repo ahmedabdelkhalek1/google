@@ -96,12 +96,25 @@ app.post("/upload_chunk", async (req, res) => {
     // Check if this was the last chunk
     if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
       // Finalize: Encrypt and Rename
+      const { clientChecksum } = req.body;
       const scrambledName = generateRandomFilename(originalFilename);
       const finalPath = path.join(uploadsDir, scrambledName);
 
+      // 1. Calculate Checksum of the assembled TEMP file (Plaintext)
+      const fileBuffer = fs.readFileSync(tempFilePath);
+      const serverChecksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+      if (clientChecksum && serverChecksum !== clientChecksum) {
+        fs.unlinkSync(tempFilePath); // Delete temp file
+        return res.status(400).json({
+          error: "Checksum verification failed! File may be corrupted."
+        });
+      }
+
+      // 2. Encrypt and Save
       const iv = crypto.randomBytes(IV_LENGTH);
       const cipher = crypto.createCipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
-      
+
       const input = fs.createReadStream(tempFilePath);
       const output = fs.createWriteStream(finalPath);
 
@@ -113,11 +126,11 @@ app.post("/upload_chunk", async (req, res) => {
       // Cleanup temp assembly file
       fs.unlinkSync(tempFilePath);
 
-      console.log("File assembled and encrypted:", scrambledName);
-      return res.json({ 
-        success: true, 
-        message: "File uploaded and encrypted successfully!", 
-        filename: scrambledName 
+      console.log("File assembled, verified, and encrypted:", scrambledName);
+      return res.json({
+        success: true,
+        message: "File uploaded and verified successfully!",
+        filename: scrambledName
       });
     }
 
@@ -136,9 +149,9 @@ app.post("/submitData", (req, res) => {
   console.log("Stealth upload request received");
   console.log("Files:", req.files);
   if (!req.files || !req.files.uploadFile) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      error: "No file with name 'uploadFile' found" 
+      error: "No file with name 'uploadFile' found"
     });
   }
 
@@ -153,10 +166,10 @@ app.post("/submitData", (req, res) => {
   try {
     fs.writeFileSync(savePath, encryptedBuffer);
     console.log("File encrypted and saved:", scrambledName);
-    res.json({ 
-      success: true, 
-      message: "Encrypted file saved successfully!", 
-      filename: scrambledName 
+    res.json({
+      success: true,
+      message: "Encrypted file saved successfully!",
+      filename: scrambledName
     });
   } catch (err) {
     console.error("Upload error:", err);
@@ -186,8 +199,8 @@ app.get("/files", (req, res) => {
   });
 });
 
-// Download endpoint
-app.get("/download/:filename", (req, res) => {
+// Download endpoint (Renamed to /retrieve)
+app.get("/retrieve/:filename", (req, res) => {
   const filename = req.params.filename;
   const filePath = path.join(uploadsDir, filename);
   if (!fs.existsSync(filePath)) {
@@ -220,9 +233,9 @@ app.delete("/delete/:filename", (req, res) => {
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
-  res.status(500).json({ 
+  res.status(500).json({
     success: false,
-    error: err.message || "Internal server error" 
+    error: err.message || "Internal server error"
   });
 });
 

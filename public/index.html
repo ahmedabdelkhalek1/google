@@ -1,41 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>File Sharing App</title>
   <style>
     /* ... [UNCHANGED CSS, keep yours as is] ... */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
       padding: 20px;
     }
+
     .container {
       max-width: 800px;
       margin: 0 auto;
       background: white;
       border-radius: 15px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
       overflow: hidden;
     }
+
     .header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       padding: 30px;
       text-align: center;
     }
-    .header h1 { font-size: 2em; margin-bottom: 10px; }
-    .content { padding: 30px; }
-    .upload-section, .files-section { margin-bottom: 30px; }
+
+    .header h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .upload-section,
+    .files-section {
+      margin-bottom: 30px;
+    }
+
     h2 {
       color: #333;
       margin-bottom: 20px;
       padding-bottom: 10px;
       border-bottom: 2px solid #667eea;
     }
+
     .upload-area {
       border: 3px dashed #667eea;
       border-radius: 10px;
@@ -44,9 +65,21 @@
       cursor: pointer;
       transition: all 0.3s;
     }
-    .upload-area:hover { background: #f8f9ff; border-color: #764ba2; }
-    .upload-area.dragover { background: #e8ebff; border-color: #764ba2; }
-    input[type="file"] { display: none; }
+
+    .upload-area:hover {
+      background: #f8f9ff;
+      border-color: #764ba2;
+    }
+
+    .upload-area.dragover {
+      background: #e8ebff;
+      border-color: #764ba2;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
     .btn {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -58,12 +91,21 @@
       margin-top: 15px;
       transition: transform 0.2s;
     }
+
     .btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
     }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .file-list { list-style: none; }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .file-list {
+      list-style: none;
+    }
+
     .file-item {
       background: #f8f9fa;
       padding: 15px;
@@ -73,40 +115,82 @@
       justify-content: space-between;
       align-items: center;
     }
-    .file-info { flex: 1; }
+
+    .file-info {
+      flex: 1;
+    }
+
     .file-name {
       font-weight: 600;
       color: #333;
       word-break: break-all;
     }
+
     .file-size {
       color: #666;
       font-size: 0.9em;
       margin-top: 5px;
     }
+
     .file-actions {
       display: flex;
       gap: 10px;
     }
-    .btn-small { padding: 8px 15px; font-size: 14px; margin: 0; }
-    .btn-download { background: #28a745; }
-    .btn-delete { background: #dc3545; }
+
+    .btn-small {
+      padding: 8px 15px;
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .btn-download {
+      background: #28a745;
+    }
+
+    .btn-delete {
+      background: #dc3545;
+    }
+
     .message {
       padding: 15px;
       border-radius: 8px;
       margin-bottom: 20px;
       text-align: center;
     }
-    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-    .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-    .hidden { display: none; }
+
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .hidden {
+      display: none;
+    }
+
     @media (max-width: 600px) {
-      .file-item { flex-direction: column; gap: 10px; }
-      .file-actions { width: 100%; }
-      .btn-small { flex: 1; }
+      .file-item {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .file-actions {
+        width: 100%;
+      }
+
+      .btn-small {
+        flex: 1;
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
@@ -124,10 +208,12 @@
           <button class="btn" id="selectBtn">Select File</button>
         </div>
         <button class="btn" id="uploadBtn" disabled>Upload File</button>
-        <div id="progressBarContainer" style="display: none; margin-top: 15px; background: #eee; border-radius: 10px; overflow: hidden;">
+        <div id="progressBarContainer"
+          style="display: none; margin-top: 15px; background: #eee; border-radius: 10px; overflow: hidden;">
           <div id="progressBar" style="width: 0%; height: 20px; background: #667eea; transition: width 0.3s;"></div>
         </div>
-        <p id="progressText" style="text-align: center; margin-top: 5px; font-size: 0.9em; color: #666; display: none;"></p>
+        <p id="progressText" style="text-align: center; margin-top: 5px; font-size: 0.9em; color: #666; display: none;">
+        </p>
       </div>
       <div class="files-section">
         <h2>📥 Available Files</h2>
@@ -184,13 +270,27 @@
     const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks (safe for proxies)
     const MAX_RETRIES = 3;
 
-    async function uploadChunk(chunk, chunkIndex, totalChunks, fileId, originalFilename) {
+    // Calculate SHA-256 Checksum
+    async function calculateChecksum(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+    }
+
+    async function uploadChunk(chunk, chunkIndex, totalChunks, fileId, originalFilename, clientChecksum) {
       const formData = new FormData();
       formData.append('chunk', chunk);
       formData.append('chunkIndex', chunkIndex);
       formData.append('totalChunks', totalChunks);
       formData.append('fileId', fileId);
       formData.append('originalFilename', originalFilename);
+
+      // Send checksum only with the last chunk
+      if (chunkIndex === totalChunks - 1) {
+        formData.append('clientChecksum', clientChecksum);
+      }
 
       let retries = 0;
       while (retries < MAX_RETRIES) {
@@ -199,8 +299,11 @@
             method: 'POST',
             body: formData
           });
-          
-          if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || `Server error: ${response.status}`);
+          }
           return await response.json();
         } catch (err) {
           retries++;
@@ -216,33 +319,39 @@
       if (!selectedFile) return;
 
       uploadBtn.disabled = true;
-      uploadBtn.textContent = 'Uploading...';
+      uploadBtn.textContent = 'Calculating Checksum...';
       progressBarContainer.style.display = 'block';
       progressText.style.display = 'block';
       progressBar.style.width = '0%';
-
-      const fileId = Date.now().toString(); // Simple unique ID for this upload session
-      const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
-      let chunkIndex = 0;
+      progressText.textContent = 'Verifying file integrity...';
 
       try {
+        // 1. Calculate Checksum
+        const clientChecksum = await calculateChecksum(selectedFile);
+        console.log("Client Checksum:", clientChecksum);
+
+        uploadBtn.textContent = 'Uploading...';
+        const fileId = Date.now().toString();
+        const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
+        let chunkIndex = 0;
+
         for (let start = 0; start < selectedFile.size; start += CHUNK_SIZE) {
           const chunk = selectedFile.slice(start, start + CHUNK_SIZE);
-          
+
           // Update UI
           const percent = Math.round((chunkIndex / totalChunks) * 100);
           progressBar.style.width = `${percent}%`;
           progressText.textContent = `Uploading chunk ${chunkIndex + 1} of ${totalChunks} (${percent}%)`;
 
-          await uploadChunk(chunk, chunkIndex, totalChunks, fileId, selectedFile.name);
+          await uploadChunk(chunk, chunkIndex, totalChunks, fileId, selectedFile.name, clientChecksum);
           chunkIndex++;
         }
 
         // Complete
         progressBar.style.width = '100%';
-        progressText.textContent = 'Upload Complete!';
-        showMessage('File uploaded successfully!', 'success');
-        
+        progressText.textContent = 'Upload Complete & Verified!';
+        showMessage('File uploaded and verified successfully!', 'success');
+
         // Reset UI
         setTimeout(() => {
           fileInput.value = '';
@@ -301,9 +410,9 @@
       }
     }
 
-    // Download file
+    // Download file (Updated to /retrieve)
     window.downloadFile = (filename) => {
-      window.location.href = `/download/${encodeURIComponent(filename)}`;
+      window.location.href = `/retrieve/${encodeURIComponent(filename)}`;
     };
 
     // Delete file
@@ -345,4 +454,5 @@
     loadFiles();
   </script>
 </body>
+
 </html>
