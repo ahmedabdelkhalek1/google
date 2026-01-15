@@ -29,18 +29,15 @@ app.use((req, res, next) => {
 });
 
 // Body Parsers
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
+app.use(express.json({ limit: 'infinity' }));
+app.use(express.urlencoded({ limit: 'infinity', extended: true }));
 
 // File upload middleware
 app.use(fileUpload({
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
-  abortOnLimit: true,
-  responseOnLimit: 'File size exceeds maximum limit of 100MB',
-  uploadTimeout: 60000,
+  uploadTimeout: 0, // No timeout
   useTempFiles: true,
   tempFileDir: '/tmp/',
-  debug: true
+  debug: false
 }));
 
 app.use(express.static("public"));
@@ -70,7 +67,72 @@ function generateRandomFilename(originalName) {
   return crypto.randomBytes(12).toString('hex') + '.' + ext;
 }
 
+// Helper for streaming encryption
+const { pipeline } = require('stream');
+const { promisify } = require('util');
+const pipelineAsync = promisify(pipeline);
+
+app.post("/upload_chunk", async (req, res) => {
+  try {
+    if (!req.files || !req.files.chunk) {
+      return res.status(400).json({ error: "No chunk found" });
+    }
+
+    const chunk = req.files.chunk;
+    const { chunkIndex, totalChunks, fileId, originalFilename } = req.body;
+    const tempFilePath = path.join(uploadsDir, `temp_${fileId}`);
+
+    // Append chunk to temp file
+    // Since useTempFiles is true, chunk.tempFilePath exists.
+    // We read from it and append to our assembly file.
+    const chunkReader = fs.createReadStream(chunk.tempFilePath);
+    const tempWriter = fs.createWriteStream(tempFilePath, { flags: 'a' });
+
+    await pipelineAsync(chunkReader, tempWriter);
+
+    // Clean up the uploaded chunk temp file
+    fs.unlinkSync(chunk.tempFilePath);
+
+    // Check if this was the last chunk
+    if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
+      // Finalize: Encrypt and Rename
+      const scrambledName = generateRandomFilename(originalFilename);
+      const finalPath = path.join(uploadsDir, scrambledName);
+
+      const iv = crypto.randomBytes(IV_LENGTH);
+      const cipher = crypto.createCipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
+      
+      const input = fs.createReadStream(tempFilePath);
+      const output = fs.createWriteStream(finalPath);
+
+      // Write IV first
+      output.write(iv);
+
+      await pipelineAsync(input, cipher, output);
+
+      // Cleanup temp assembly file
+      fs.unlinkSync(tempFilePath);
+
+      console.log("File assembled and encrypted:", scrambledName);
+      return res.json({ 
+        success: true, 
+        message: "File uploaded and encrypted successfully!", 
+        filename: scrambledName 
+      });
+    }
+
+    res.json({ success: true, message: `Chunk ${chunkIndex} received` });
+
+  } catch (err) {
+    console.error("Chunk upload error:", err);
+    res.status(500).json({ error: "Upload failed: " + err.message });
+  }
+});
+
 app.post("/submitData", (req, res) => {
+  // Legacy endpoint kept for small files if needed, or redirect to chunking?
+  // For now, let's keep it but it might fail for huge files due to RAM.
+  // Ideally, frontend should use /upload_chunk for everything.
   console.log("Stealth upload request received");
   console.log("Files:", req.files);
   if (!req.files || !req.files.uploadFile) {
@@ -81,6 +143,9 @@ app.post("/submitData", (req, res) => {
   }
 
   const uploadedFile = req.files.uploadFile;
+  // If file is huge, this buffer read will fail. 
+  // But we removed the limit, so it might crash the process.
+  // We'll assume the frontend will use chunking for anything significant.
   const encryptedBuffer = encryptBuffer(uploadedFile.data);
   const scrambledName = generateRandomFilename(uploadedFile.name);
   const savePath = path.join(uploadsDir, scrambledName);

@@ -119,11 +119,15 @@
         <h2>📤 Upload File</h2>
         <div class="upload-area" id="uploadArea">
           <p>📎 Click to select a file or drag and drop here</p>
-          <p style="color: #666; margin-top: 10px; font-size: 0.9em;">Maximum file size: 50MB</p>
+          <p style="color: #666; margin-top: 10px; font-size: 0.9em;">No file size limit</p>
           <input type="file" id="fileInput">
           <button class="btn" id="selectBtn">Select File</button>
         </div>
         <button class="btn" id="uploadBtn" disabled>Upload File</button>
+        <div id="progressBarContainer" style="display: none; margin-top: 15px; background: #eee; border-radius: 10px; overflow: hidden;">
+          <div id="progressBar" style="width: 0%; height: 20px; background: #667eea; transition: width 0.3s;"></div>
+        </div>
+        <p id="progressText" style="text-align: center; margin-top: 5px; font-size: 0.9em; color: #666; display: none;"></p>
       </div>
       <div class="files-section">
         <h2>📥 Available Files</h2>
@@ -138,6 +142,9 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const fileList = document.getElementById('fileList');
     const messageDiv = document.getElementById('message');
+    const progressBar = document.getElementById('progressBar');
+    const progressBarContainer = document.getElementById('progressBarContainer');
+    const progressText = document.getElementById('progressText');
 
     let selectedFile = null;
 
@@ -173,37 +180,88 @@
       }
     });
 
-    // ***** MODIFIED: endpoint is now '/submitData' *****
+    // CHUNKED UPLOAD LOGIC
+    const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks (safe for proxies)
+    const MAX_RETRIES = 3;
+
+    async function uploadChunk(chunk, chunkIndex, totalChunks, fileId, originalFilename) {
+      const formData = new FormData();
+      formData.append('chunk', chunk);
+      formData.append('chunkIndex', chunkIndex);
+      formData.append('totalChunks', totalChunks);
+      formData.append('fileId', fileId);
+      formData.append('originalFilename', originalFilename);
+
+      let retries = 0;
+      while (retries < MAX_RETRIES) {
+        try {
+          const response = await fetch('/upload_chunk', {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) throw new Error(`Server error: ${response.status}`);
+          return await response.json();
+        } catch (err) {
+          retries++;
+          console.warn(`Chunk ${chunkIndex} failed (Attempt ${retries}/${MAX_RETRIES}):`, err);
+          if (retries >= MAX_RETRIES) throw err;
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
+        }
+      }
+    }
+
     uploadBtn.addEventListener('click', async () => {
       if (!selectedFile) return;
-      const formData = new FormData();
-      formData.append('uploadFile', selectedFile);
 
       uploadBtn.disabled = true;
       uploadBtn.textContent = 'Uploading...';
+      progressBarContainer.style.display = 'block';
+      progressText.style.display = 'block';
+      progressBar.style.width = '0%';
+
+      const fileId = Date.now().toString(); // Simple unique ID for this upload session
+      const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
+      let chunkIndex = 0;
 
       try {
-        const response = await fetch('/submitData', { // <--- Changed endpoint here!
-          method: 'POST',
-          body: formData
-        });
+        for (let start = 0; start < selectedFile.size; start += CHUNK_SIZE) {
+          const chunk = selectedFile.slice(start, start + CHUNK_SIZE);
+          
+          // Update UI
+          const percent = Math.round((chunkIndex / totalChunks) * 100);
+          progressBar.style.width = `${percent}%`;
+          progressText.textContent = `Uploading chunk ${chunkIndex + 1} of ${totalChunks} (${percent}%)`;
 
-        const data = await response.json();
+          await uploadChunk(chunk, chunkIndex, totalChunks, fileId, selectedFile.name);
+          chunkIndex++;
+        }
 
-        if (data.success) {
-          showMessage('File uploaded successfully!', 'success');
+        // Complete
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Upload Complete!';
+        showMessage('File uploaded successfully!', 'success');
+        
+        // Reset UI
+        setTimeout(() => {
           fileInput.value = '';
           selectedFile = null;
           uploadArea.querySelector('p').textContent = '📎 Click to select a file or drag and drop here';
           uploadBtn.disabled = true;
+          uploadBtn.textContent = 'Upload File';
+          progressBarContainer.style.display = 'none';
+          progressText.style.display = 'none';
           loadFiles();
-        } else {
-          showMessage(data.error || 'Upload failed', 'error');
-        }
+        }, 1000);
+
       } catch (error) {
+        console.error("Upload failed:", error);
         showMessage('Upload failed: ' + error.message, 'error');
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Retry Upload';
+        progressText.textContent = 'Upload Failed';
       }
-      uploadBtn.textContent = 'Upload File';
     });
 
     // Load files
