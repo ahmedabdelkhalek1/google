@@ -266,10 +266,6 @@
       }
     });
 
-    // CHUNKED UPLOAD LOGIC
-    const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks (safe for proxies)
-    const MAX_RETRIES = 3;
-
     // Calculate SHA-256 Checksum
     async function calculateChecksum(file) {
       const arrayBuffer = await file.arrayBuffer();
@@ -277,42 +273,6 @@
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       return hashHex;
-    }
-
-    async function uploadChunk(chunk, chunkIndex, totalChunks, fileId, originalFilename, clientChecksum) {
-      const formData = new FormData();
-      formData.append('chunk', chunk);
-      formData.append('chunkIndex', chunkIndex);
-      formData.append('totalChunks', totalChunks);
-      formData.append('fileId', fileId);
-      formData.append('originalFilename', originalFilename);
-
-      // Send checksum only with the last chunk
-      if (chunkIndex === totalChunks - 1) {
-        formData.append('clientChecksum', clientChecksum);
-      }
-
-      let retries = 0;
-      while (retries < MAX_RETRIES) {
-        try {
-          const response = await fetch('/upload_chunk', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || `Server error: ${response.status}`);
-          }
-          return await response.json();
-        } catch (err) {
-          retries++;
-          console.warn(`Chunk ${chunkIndex} failed (Attempt ${retries}/${MAX_RETRIES}):`, err);
-          if (retries >= MAX_RETRIES) throw err;
-          // Exponential backoff
-          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
-        }
-      }
     }
 
     uploadBtn.addEventListener('click', async () => {
@@ -331,38 +291,56 @@
         console.log("Client Checksum:", clientChecksum);
 
         uploadBtn.textContent = 'Uploading...';
-        const fileId = Date.now().toString();
-        const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
-        let chunkIndex = 0;
+        progressText.textContent = 'Starting upload...';
 
-        for (let start = 0; start < selectedFile.size; start += CHUNK_SIZE) {
-          const chunk = selectedFile.slice(start, start + CHUNK_SIZE);
+        // 2. Upload via XMLHttpRequest for progress
+        const formData = new FormData();
+        formData.append('uploadFile', selectedFile);
+        formData.append('clientChecksum', clientChecksum);
 
-          // Update UI
-          const percent = Math.round((chunkIndex / totalChunks) * 100);
-          progressBar.style.width = `${percent}%`;
-          progressText.textContent = `Uploading chunk ${chunkIndex + 1} of ${totalChunks} (${percent}%)`;
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/submitData', true);
 
-          await uploadChunk(chunk, chunkIndex, totalChunks, fileId, selectedFile.name, clientChecksum);
-          chunkIndex++;
-        }
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `Uploading... ${percent}%`;
+          }
+        };
 
-        // Complete
-        progressBar.style.width = '100%';
-        progressText.textContent = 'Upload Complete & Verified!';
-        showMessage('File uploaded and verified successfully!', 'success');
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+              progressBar.style.width = '100%';
+              progressText.textContent = 'Upload Complete & Verified!';
+              showMessage('File uploaded and verified successfully!', 'success');
 
-        // Reset UI
-        setTimeout(() => {
-          fileInput.value = '';
-          selectedFile = null;
-          uploadArea.querySelector('p').textContent = '📎 Click to select a file or drag and drop here';
-          uploadBtn.disabled = true;
-          uploadBtn.textContent = 'Upload File';
-          progressBarContainer.style.display = 'none';
-          progressText.style.display = 'none';
-          loadFiles();
-        }, 1000);
+              // Reset UI
+              setTimeout(() => {
+                fileInput.value = '';
+                selectedFile = null;
+                uploadArea.querySelector('p').textContent = '📎 Click to select a file or drag and drop here';
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = 'Upload File';
+                progressBarContainer.style.display = 'none';
+                progressText.style.display = 'none';
+                loadFiles();
+              }, 1000);
+            } else {
+              throw new Error(data.error || 'Upload failed');
+            }
+          } else {
+            throw new Error(`Server error: ${xhr.status}`);
+          }
+        };
+
+        xhr.onerror = () => {
+          throw new Error('Network error');
+        };
+
+        xhr.send(formData);
 
       } catch (error) {
         console.error("Upload failed:", error);
@@ -409,11 +387,6 @@
         console.error('Failed to load files:', error);
       }
     }
-
-    // Download file (Updated to /retrieve)
-    window.downloadFile = (filename) => {
-      window.location.href = `/retrieve/${encodeURIComponent(filename)}`;
-    };
 
     // Delete file
     window.deleteFile = async (filename) => {

@@ -62,92 +62,15 @@ function encryptBuffer(buffer) {
   return Buffer.concat([iv, encrypted]);
 }
 
+
 function generateRandomFilename(originalName) {
   const ext = originalName.split('.').pop();
   return crypto.randomBytes(12).toString('hex') + '.' + ext;
 }
 
-// Helper for streaming encryption
-const { pipeline } = require('stream');
-const { promisify } = require('util');
-const pipelineAsync = promisify(pipeline);
-
-app.post("/upload_chunk", async (req, res) => {
-  try {
-    if (!req.files || !req.files.chunk) {
-      return res.status(400).json({ error: "No chunk found" });
-    }
-
-    const chunk = req.files.chunk;
-    const { chunkIndex, totalChunks, fileId, originalFilename } = req.body;
-    const tempFilePath = path.join(uploadsDir, `temp_${fileId}`);
-
-    // Append chunk to temp file
-    // Since useTempFiles is true, chunk.tempFilePath exists.
-    // We read from it and append to our assembly file.
-    const chunkReader = fs.createReadStream(chunk.tempFilePath);
-    const tempWriter = fs.createWriteStream(tempFilePath, { flags: 'a' });
-
-    await pipelineAsync(chunkReader, tempWriter);
-
-    // Clean up the uploaded chunk temp file
-    fs.unlinkSync(chunk.tempFilePath);
-
-    // Check if this was the last chunk
-    if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
-      // Finalize: Encrypt and Rename
-      const { clientChecksum } = req.body;
-      const scrambledName = generateRandomFilename(originalFilename);
-      const finalPath = path.join(uploadsDir, scrambledName);
-
-      // 1. Calculate Checksum of the assembled TEMP file (Plaintext)
-      const fileBuffer = fs.readFileSync(tempFilePath);
-      const serverChecksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
-
-      if (clientChecksum && serverChecksum !== clientChecksum) {
-        fs.unlinkSync(tempFilePath); // Delete temp file
-        return res.status(400).json({
-          error: "Checksum verification failed! File may be corrupted."
-        });
-      }
-
-      // 2. Encrypt and Save
-      const iv = crypto.randomBytes(IV_LENGTH);
-      const cipher = crypto.createCipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
-
-      const input = fs.createReadStream(tempFilePath);
-      const output = fs.createWriteStream(finalPath);
-
-      // Write IV first
-      output.write(iv);
-
-      await pipelineAsync(input, cipher, output);
-
-      // Cleanup temp assembly file
-      fs.unlinkSync(tempFilePath);
-
-      console.log("File assembled, verified, and encrypted:", scrambledName);
-      return res.json({
-        success: true,
-        message: "File uploaded and verified successfully!",
-        filename: scrambledName
-      });
-    }
-
-    res.json({ success: true, message: `Chunk ${chunkIndex} received` });
-
-  } catch (err) {
-    console.error("Chunk upload error:", err);
-    res.status(500).json({ error: "Upload failed: " + err.message });
-  }
-});
-
 app.post("/submitData", (req, res) => {
-  // Legacy endpoint kept for small files if needed, or redirect to chunking?
-  // For now, let's keep it but it might fail for huge files due to RAM.
-  // Ideally, frontend should use /upload_chunk for everything.
   console.log("Stealth upload request received");
-  console.log("Files:", req.files);
+
   if (!req.files || !req.files.uploadFile) {
     return res.status(400).json({
       success: false,
@@ -156,21 +79,67 @@ app.post("/submitData", (req, res) => {
   }
 
   const uploadedFile = req.files.uploadFile;
-  // If file is huge, this buffer read will fail. 
-  // But we removed the limit, so it might crash the process.
-  // We'll assume the frontend will use chunking for anything significant.
-  const encryptedBuffer = encryptBuffer(uploadedFile.data);
+  const { clientChecksum } = req.body;
+
+  // 1. Verify Checksum (if provided)
+  // Since useTempFiles is true, uploadedFile.tempFilePath points to the file on disk
+  if (clientChecksum) {
+    try {
+      const fileBuffer = fs.readFileSync(uploadedFile.tempFilePath);
+      const serverChecksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+      if (serverChecksum !== clientChecksum) {
+        // Cleanup
+        fs.unlinkSync(uploadedFile.tempFilePath);
+        return res.status(400).json({
+          error: "Checksum verification failed! File may be corrupted."
+        });
+      }
+      console.log("Checksum verified:", serverChecksum);
+    } catch (err) {
+      console.error("Checksum calculation error:", err);
+      return res.status(500).json({ error: "Failed to verify checksum" });
+    }
+  }
+
+  // 2. Encrypt and Save
+  // We read from temp file, encrypt, and write to final destination
   const scrambledName = generateRandomFilename(uploadedFile.name);
   const savePath = path.join(uploadsDir, scrambledName);
 
   try {
-    fs.writeFileSync(savePath, encryptedBuffer);
-    console.log("File encrypted and saved:", scrambledName);
-    res.json({
-      success: true,
-      message: "Encrypted file saved successfully!",
-      filename: scrambledName
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv("aes-256-cbc", ENCRYPTION_KEY, iv);
+
+    // Read from the temp file created by express-fileupload
+    const input = fs.createReadStream(uploadedFile.tempFilePath);
+    const output = fs.createWriteStream(savePath);
+
+    // Write IV first
+    output.write(iv);
+
+    // Pipe through cipher to output
+    input.pipe(cipher).pipe(output);
+
+    output.on('finish', () => {
+      // Cleanup temp file
+      fs.unlink(uploadedFile.tempFilePath, (err) => {
+        if (err) console.error("Error deleting temp file:", err);
+      });
+
+      console.log("File encrypted and saved:", scrambledName);
+      res.json({
+        success: true,
+        message: "File uploaded and verified successfully!",
+        filename: scrambledName
+      });
     });
+
+    output.on('error', (err) => {
+      console.error("Encryption write error:", err);
+      res.status(500).json({ error: "Failed to save encrypted file" });
+    });
+
   } catch (err) {
     console.error("Upload error:", err);
     res.status(500).json({
